@@ -31,6 +31,10 @@
 #endif 
 
 
+#define NET_BROADCAST_MAC           \
+    {                                   \
+        0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF  \
+    } // 广播 mac 地址
 
 #define ETHERNET_MAX_TRANSPORT_UNIT 1500 //以太网最大传输单元
 

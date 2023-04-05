@@ -20,6 +20,12 @@ map_t net_table;
 uint8_t net_if_mac[NET_MAC_LEN] = NET_IF_MAC;
 
 /**
+ * @brief 广播 MAC 地址
+ * 
+*/
+uint8_t net_broadcast_mac[NET_MAC_LEN] = NET_BROADCAST_MAC;
+
+/**
  * @brief 网卡IP地址
  * 
  */
