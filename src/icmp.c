@@ -11,6 +11,19 @@
 static void icmp_resp(buf_t *req_buf, uint8_t *src_ip)
 {
     // TO-DO
+    buf_init(&txbuf, req_buf->len);
+    // 填写首部
+    icmp_hdr_t *icmp_hdr = (icmp_hdr_t *)txbuf.data;
+    icmp_hdr->type = ICMP_TYPE_ECHO_REPLY;
+    icmp_hdr->code = 0;
+    icmp_hdr->checksum16 = 0;
+    icmp_hdr->id16 = ((icmp_hdr_t *)req_buf->data)->id16;
+    icmp_hdr->seq16 = ((icmp_hdr_t *)req_buf->data)->seq16;
+    if (req_buf->len - sizeof(icmp_hdr_t) > 0)
+        memcpy(txbuf.data +sizeof(icmp_hdr_t), req_buf->data + sizeof(icmp_hdr_t), req_buf->len - sizeof(icmp_hdr_t));
+    icmp_hdr->checksum16 = swap16(checksum16((uint16_t*)txbuf.data, txbuf.len));
+
+    ip_out(&txbuf, src_ip, NET_PROTOCOL_ICMP);
 }
 
 /**
@@ -22,6 +35,13 @@ static void icmp_resp(buf_t *req_buf, uint8_t *src_ip)
 void icmp_in(buf_t *buf, uint8_t *src_ip)
 {
     // TO-DO
+    if (buf->len < sizeof(icmp_hdr_t)) return;
+
+    icmp_hdr_t *icmp_hdr = (icmp_hdr_t *)buf->data;
+    if (icmp_hdr->type == ICMP_TYPE_ECHO_REQUEST) 
+    {
+        icmp_resp(buf, src_ip);
+    }
 }
 
 /**
@@ -34,6 +54,19 @@ void icmp_in(buf_t *buf, uint8_t *src_ip)
 void icmp_unreachable(buf_t *recv_buf, uint8_t *src_ip, icmp_code_t code)
 {
     // TO-DO
+    buf_init(&txbuf, sizeof(icmp_hdr_t) + sizeof(ip_hdr_t) + 8);
+    // 填写首部
+    icmp_hdr_t *icmp_hdr = (icmp_hdr_t *)txbuf.data;
+    icmp_hdr->type = ICMP_TYPE_UNREACH;
+    icmp_hdr->code = code;
+    icmp_hdr->checksum16 = 0;
+    // “差错报文”这里全设为0
+    icmp_hdr->id16 = 0;
+    icmp_hdr->seq16 = 0;
+    memcpy(txbuf.data + sizeof(icmp_hdr_t), recv_buf->data, sizeof(ip_hdr_t) + 8);
+    icmp_hdr->checksum16 = swap16(checksum16((uint16_t*)txbuf.data, txbuf.len));
+
+    ip_out(&txbuf, src_ip, NET_PROTOCOL_ICMP);
 }
 
 /**
