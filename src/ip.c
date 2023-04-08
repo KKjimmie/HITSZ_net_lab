@@ -102,18 +102,20 @@ void ip_out(buf_t *buf, uint8_t *ip, net_protocol_t protocol)
     }
     else
     {
+        size_t len_left = buf->len;
         uint16_t no = 0; // 第几个分片
-        while((no + 1) * IP_MAX_TRANSPRT_UNIT < buf->len)
+        while(len_left > IP_MAX_TRANSPRT_UNIT)
         {
             buf_t ip_buf;
             buf_init(&ip_buf, IP_MAX_TRANSPRT_UNIT);
             memcpy(ip_buf.data, buf->data + no * IP_MAX_TRANSPRT_UNIT, IP_MAX_TRANSPRT_UNIT);
             ip_fragment_out(&ip_buf, ip, protocol, send_id, no * IP_MAX_TRANSPRT_UNIT, 1);
             no ++;
+            len_left -= IP_MAX_TRANSPRT_UNIT;
         }
         buf_t ip_buf;
-        buf_init(&ip_buf, buf->len - no * IP_MAX_TRANSPRT_UNIT);
-        memcpy(ip_buf.data, buf->data + no * IP_MAX_TRANSPRT_UNIT, buf->len - no * IP_MAX_TRANSPRT_UNIT);
+        buf_init(&ip_buf, len_left);
+        memcpy(ip_buf.data, buf->data + no * IP_MAX_TRANSPRT_UNIT, len_left);
         ip_fragment_out(&ip_buf, ip, protocol, send_id++, no * IP_MAX_TRANSPRT_UNIT, 0);
     }
 }
