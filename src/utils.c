@@ -82,11 +82,13 @@ uint16_t checksum16(uint16_t *data, size_t len)
     {
     // ----> 特别注意这里的大小端转换
         sum += swap16(*data++);
+        while((sum >> 16) > 0)
+            sum = (sum & 0xFFFF) + (sum >> 16);
         len -= 2;
     }
     if (len == 1)
-        sum += *(uint8_t *)data;
-    while (sum >> 16)
+        sum += (*(uint8_t *)data) << 8;
+    while ((sum >> 16) > 0)
         sum = (sum & 0xFFFF) + (sum >> 16);
-    return ~sum;
+    return ~(uint16_t)sum;
 }

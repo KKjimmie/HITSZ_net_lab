@@ -19,6 +19,21 @@ map_t udp_table;
 static uint16_t udp_checksum(buf_t *buf, uint8_t *src_ip, uint8_t *dst_ip)
 {
     // TO-DO
+    uint16_t len = ((udp_hdr_t *)buf->data)->total_len16;
+    udp_peso_hdr_t *peso_hdr = (udp_peso_hdr_t *)(buf->data - sizeof(udp_peso_hdr_t));
+    // 暂存要被覆盖的部分
+    udp_peso_hdr_t pre;
+    memcpy(&pre, peso_hdr, sizeof(udp_peso_hdr_t));
+    memcpy(peso_hdr->src_ip, src_ip, NET_IP_LEN);
+    memcpy(peso_hdr->dst_ip, dst_ip, NET_IP_LEN);
+    peso_hdr->placeholder = 0;
+    peso_hdr->protocol = NET_PROTOCOL_UDP;
+    peso_hdr->total_len16 = len;
+    uint16_t checksum = checksum16((uint16_t *)peso_hdr, swap16(len) + sizeof(udp_peso_hdr_t));
+    memcpy(peso_hdr, &pre, sizeof(udp_peso_hdr_t));
+
+    printf("udp_checksum: %lx\n", (long unsigned int)checksum);
+    return checksum;
 }
 
 /**
@@ -30,6 +45,26 @@ static uint16_t udp_checksum(buf_t *buf, uint8_t *src_ip, uint8_t *dst_ip)
 void udp_in(buf_t *buf, uint8_t *src_ip)
 {
     // TO-DO
+    if (buf->len < sizeof(udp_hdr_t)) return;
+    udp_hdr_t * udp_hdr = (udp_hdr_t *)buf->data;
+    if (buf->len < swap16(udp_hdr->total_len16)) return;
+    uint16_t origin_checksum = udp_hdr->checksum16;
+    udp_hdr->checksum16 = 0;
+    if (origin_checksum != swap16(udp_checksum(buf, src_ip, net_if_ip))) return;
+    udp_hdr->checksum16 = origin_checksum;
+
+    udp_handler_t *handler = NULL;
+    uint16_t dst_port = swap16(udp_hdr->dst_port16);
+    if ((handler = map_get(&udp_table, &dst_port)) != NULL)
+    {
+        buf_remove_header(buf, sizeof(udp_hdr_t));
+        (*handler)(buf->data, buf->len, src_ip, swap16(udp_hdr->src_port16));
+    }
+    else 
+    {
+        buf_add_header(buf, sizeof(udp_hdr_t));
+        icmp_unreachable(buf, src_ip, ICMP_CODE_PORT_UNREACH);
+    }
 }
 
 /**
@@ -43,6 +78,16 @@ void udp_in(buf_t *buf, uint8_t *src_ip)
 void udp_out(buf_t *buf, uint16_t src_port, uint8_t *dst_ip, uint16_t dst_port)
 {
     // TO-DO
+    buf_add_header(buf, sizeof(udp_hdr_t));
+    udp_hdr_t *udp_hdr = (udp_hdr_t *)buf->data;
+    // 填充首部字段
+    udp_hdr->src_port16 = swap16(src_port);
+    udp_hdr->dst_port16 = swap16(dst_port);
+    udp_hdr->total_len16 = swap16(buf->len);
+    udp_hdr->checksum16 = 0;
+    udp_hdr->checksum16 = swap16(udp_checksum(buf, net_if_ip, dst_ip));
+
+    ip_out(buf, dst_ip, NET_PROTOCOL_UDP);
 }
 
 /**
@@ -64,6 +109,7 @@ void udp_init()
  */
 int udp_open(uint16_t port, udp_handler_t handler)
 {
+    printf("udp open\n");
     return map_set(&udp_table, &port, &handler);
 }
 

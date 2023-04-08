@@ -63,22 +63,21 @@ void ip_in(buf_t *buf, uint8_t *src_mac)
  */
 void ip_fragment_out(buf_t *buf, uint8_t *ip, net_protocol_t protocol, int id, uint16_t offset, int mf)
 {
-    // TO-DO
+    // // TO-DO
     buf_add_header(buf, sizeof(ip_hdr_t));
     ip_hdr_t *ip_hdr = (ip_hdr_t *)buf->data;
     
     // 填写头部信息
-    ip_hdr->hdr_len = 5;
+    ip_hdr->hdr_len = sizeof(ip_hdr_t) / IP_HDR_LEN_PER_BYTE;
     ip_hdr->version = IP_VERSION_4;
     ip_hdr->tos = 0;
-    ip_hdr->total_len16 = (mf == 0) ? swap16(buf->len) : swap16(IP_MAX_TRANSPRT_UNIT);
+    ip_hdr->total_len16 = swap16(buf->len);
     ip_hdr->id16 = swap16(id);
-    if (mf)
-        ip_hdr->flags_fragment16 = (IP_MORE_FRAGMENT | swap16(offset / IP_HDR_OFFSET_PER_BYTE));
-    else 
-        ip_hdr->flags_fragment16 = swap16(offset / IP_HDR_OFFSET_PER_BYTE);
-    memcpy(ip_hdr->dst_ip, ip, NET_IP_LEN);
+    uint16_t flags_fragment = (offset / IP_HDR_OFFSET_PER_BYTE);
+    if(mf == 1) flags_fragment |= IP_MORE_FRAGMENT;
+    ip_hdr->flags_fragment16 = swap16(flags_fragment);
     memcpy(ip_hdr->src_ip, net_if_ip, NET_IP_LEN);
+    memcpy(ip_hdr->dst_ip, ip, NET_IP_LEN);
     ip_hdr->ttl = 64;
     ip_hdr->protocol = protocol;
     ip_hdr->hdr_checksum16 = 0;
@@ -102,21 +101,20 @@ void ip_out(buf_t *buf, uint8_t *ip, net_protocol_t protocol)
         ip_fragment_out(buf, ip, protocol, send_id++, 0, 0);
     }
     else
-    {  
-        uint8_t len = buf->len;
+    {
         uint16_t no = 0; // 第几个分片
-        while(len > IP_MAX_TRANSPRT_UNIT)
+        while((no + 1) * IP_MAX_TRANSPRT_UNIT < buf->len)
         {
-            buf_init(&txbuf, IP_MAX_TRANSPRT_UNIT);
-            memcpy(&txbuf, buf + no * IP_MAX_TRANSPRT_UNIT, IP_MAX_TRANSPRT_UNIT);
-            ip_fragment_out(&txbuf, ip, protocol, send_id, no * IP_MAX_TRANSPRT_UNIT, 1);
-            len -= IP_MAX_TRANSPRT_UNIT;
-            no += 1;
+            buf_t ip_buf;
+            buf_init(&ip_buf, IP_MAX_TRANSPRT_UNIT);
+            memcpy(ip_buf.data, buf->data + no * IP_MAX_TRANSPRT_UNIT, IP_MAX_TRANSPRT_UNIT);
+            ip_fragment_out(&ip_buf, ip, protocol, send_id, no * IP_MAX_TRANSPRT_UNIT, 1);
+            no ++;
         }
-        buf_init(&txbuf, len);
-        memcpy(&txbuf, buf + no * IP_MAX_TRANSPRT_UNIT, len);
-        ip_fragment_out(&txbuf, ip, protocol, send_id, no * IP_MAX_TRANSPRT_UNIT, 0);
-        send_id++;
+        buf_t ip_buf;
+        buf_init(&ip_buf, buf->len - no * IP_MAX_TRANSPRT_UNIT);
+        memcpy(ip_buf.data, buf->data + no * IP_MAX_TRANSPRT_UNIT, buf->len - no * IP_MAX_TRANSPRT_UNIT);
+        ip_fragment_out(&ip_buf, ip, protocol, send_id++, no * IP_MAX_TRANSPRT_UNIT, 0);
     }
 }
 
