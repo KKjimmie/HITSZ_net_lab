@@ -188,7 +188,7 @@ static void tcp_send(buf_t* buf, tcp_connect_t* connect, tcp_flags_t flags) {
     hdr->window_size16 = swap16(connect->remote_win);
     hdr->chunksum16 = 0;
     hdr->urgent_pointer16 = 0;
-    hdr->chunksum16 = swap16(tcp_checksum(buf, connect->ip, net_if_ip));
+    hdr->chunksum16 = tcp_checksum(buf, connect->ip, net_if_ip);
     ip_out(buf, connect->ip, NET_PROTOCOL_TCP);
     if (flags.syn || flags.fin) {
         connect->next_seq += 1;
@@ -313,7 +313,7 @@ void tcp_in(buf_t* buf, uint8_t* src_ip) {
    tcp_hdr_t * tcp_hdr = (tcp_hdr_t *)buf->data;
    uint16_t origin_checksum = tcp_hdr->chunksum16;
    tcp_hdr->chunksum16 = 0;
-   if (origin_checksum != swap16(tcp_checksum(buf, src_ip, net_if_ip))) return;
+   if (origin_checksum != tcp_checksum(buf, src_ip, net_if_ip)) return;
    tcp_hdr->chunksum16 = origin_checksum;
 
     /*

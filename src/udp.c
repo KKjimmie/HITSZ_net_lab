@@ -50,7 +50,7 @@ void udp_in(buf_t *buf, uint8_t *src_ip)
     if (buf->len < swap16(udp_hdr->total_len16)) return;
     uint16_t origin_checksum = udp_hdr->checksum16;
     udp_hdr->checksum16 = 0;
-    if (origin_checksum != swap16(udp_checksum(buf, src_ip, net_if_ip))) return;
+    if (origin_checksum != udp_checksum(buf, src_ip, net_if_ip)) return;
     udp_hdr->checksum16 = origin_checksum;
 
     udp_handler_t *handler = NULL;
@@ -85,7 +85,7 @@ void udp_out(buf_t *buf, uint16_t src_port, uint8_t *dst_ip, uint16_t dst_port)
     udp_hdr->dst_port16 = swap16(dst_port);
     udp_hdr->total_len16 = swap16(buf->len);
     udp_hdr->checksum16 = 0;
-    udp_hdr->checksum16 = swap16(udp_checksum(buf, net_if_ip, dst_ip));
+    udp_hdr->checksum16 = udp_checksum(buf, net_if_ip, dst_ip);
 
     ip_out(buf, dst_ip, NET_PROTOCOL_UDP);
 }
