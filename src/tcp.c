@@ -337,6 +337,8 @@ void tcp_in(buf_t* buf, uint8_t* src_ip) {
    tcp_handler_t *handler = NULL;
    if ((handler = map_get(&tcp_table, &dst_port)) == NULL)
    {
+        // icmp 差错报文格式：| icmp_hdr(8) | 产生差错报文的ip_hdr(20) | 部分 udp_hdr/tcp_hdr(8)  八个字节，包括 src_port 和 dst_port|
+        buf_add_header(buf, sizeof(ip_hdr_t));
         icmp_unreachable(buf, src_ip, ICMP_CODE_PORT_UNREACH);
         return;
    }

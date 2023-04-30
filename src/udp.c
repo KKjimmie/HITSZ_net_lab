@@ -32,7 +32,7 @@ static uint16_t udp_checksum(buf_t *buf, uint8_t *src_ip, uint8_t *dst_ip)
     uint16_t checksum = checksum16((uint16_t *)peso_hdr, swap16(len) + sizeof(udp_peso_hdr_t));
     memcpy(peso_hdr, &pre, sizeof(udp_peso_hdr_t));
 
-    printf("udp_checksum: %lx\n", (long unsigned int)checksum);
+    // printf("udp_checksum: %lx\n", (long unsigned int)checksum);
     return checksum;
 }
 
@@ -62,7 +62,8 @@ void udp_in(buf_t *buf, uint8_t *src_ip)
     }
     else 
     {
-        buf_add_header(buf, sizeof(udp_hdr_t));
+        // icmp 差错报文格式：| icmp_hdr(8) | 产生差错报文的ip_hdr(20) | 部分 udp_hdr/tcp_hdr(8)  八个字节，包括 src_port 和 dst_port|
+        buf_add_header(buf, sizeof(ip_hdr_t));
         icmp_unreachable(buf, src_ip, ICMP_CODE_PORT_UNREACH);
     }
 }
@@ -78,6 +79,7 @@ void udp_in(buf_t *buf, uint8_t *src_ip)
 void udp_out(buf_t *buf, uint16_t src_port, uint8_t *dst_ip, uint16_t dst_port)
 {
     // TO-DO
+    printf("send udp packet to %s:%u len=%zu\n", iptos(dst_ip), src_port, buf->len);
     buf_add_header(buf, sizeof(udp_hdr_t));
     udp_hdr_t *udp_hdr = (udp_hdr_t *)buf->data;
     // 填充首部字段
