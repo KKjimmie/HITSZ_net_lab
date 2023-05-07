@@ -37,7 +37,7 @@ void ip_in(buf_t *buf, uint8_t *src_mac)
     if (buf->len > total_len)
         buf_remove_padding(buf, buf->len - total_len);
     
-    if (!(ip_hdr->protocol == NET_PROTOCOL_ICMP || ip_hdr->protocol == NET_PROTOCOL_UDP))
+    if (!(ip_hdr->protocol == NET_PROTOCOL_ICMP || ip_hdr->protocol == NET_PROTOCOL_UDP || ip_hdr->protocol == NET_PROTOCOL_TCP))
         icmp_unreachable(buf, ip_hdr->src_ip, ICMP_CODE_PROTOCOL_UNREACH);
 
     if (buf_remove_header(buf, sizeof(ip_hdr_t)) < 0)

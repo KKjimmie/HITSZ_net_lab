@@ -2,9 +2,11 @@
 #include "tcp.h"
 #include "net.h"
 #include "assert.h"
+#include <sys/stat.h>
 
 #define TCP_FIFO_SIZE 40
 
+// 使用一个 fifo 的队列缓存tcp连接
 typedef struct http_fifo {
     tcp_connect_t* buffer[TCP_FIFO_SIZE];
     uint8_t front, tail, count;
@@ -44,6 +46,7 @@ static tcp_connect_t* http_fifo_out(http_fifo_t* fifo) {
     return tcp;
 }
 
+// 函数的作用是从返回的http报文中读取一行
 static size_t get_line(tcp_connect_t* tcp, char* buf, size_t size) {
     size_t i = 0;
     while (i < size) {
@@ -63,6 +66,7 @@ static size_t get_line(tcp_connect_t* tcp, char* buf, size_t size) {
     return i;
 }
 
+// http 发送数据
 static size_t http_send(tcp_connect_t* tcp, const char* buf, size_t size) {
     size_t send = 0;
     while (send < size) {
@@ -72,30 +76,67 @@ static size_t http_send(tcp_connect_t* tcp, const char* buf, size_t size) {
     return send;
 }
 
+// 关闭http连接
 static void close_http(tcp_connect_t* tcp) {
     tcp_connect_close(tcp);
     printf("http closed.\n");
 }
 
 
-
+// 发送url指定的文件
 static void send_file(tcp_connect_t* tcp, const char* url) {
     FILE* file;
     uint32_t size;
-    // const char* content_type = "text/html";
     char file_path[255];
     char tx_buffer[1024];
 
     /*
-    解析url路径，查看是否是查看XHTTP_DOC_DIR目录下的文件
+    解析url路径，查看是否是查看HTTP_DOC_DIR目录下的文件
     如果不是，则发送404 NOT FOUND
     如果是，则用HTTP/1.0协议发送
 
-    注意，本实验的WEB服务器网页存放在XHTTP_DOC_DIR目录中
+    注意，本实验的WEB服务器网页存放在HTTP_DOC_DIR目录中
     */
 
-   // TODO
+    // TODO
+    // 解析url路径,传进来的url是类似 /index.html
+    sprintf(file_path, "%s%s", HTTP_DOC_DIR, url);
+    printf("filepath: %s\n", file_path);
+    // 查看是否是文件类型，如果不是，则发送404 NOT FOUND，返回404页面
+    struct stat st;
+    if (stat(file_path, &st) != 0) {
+        sprintf(file_path, "%s/404.html", HTTP_DOC_DIR);
+        file = fopen(file_path, "rb");
+        // 获取文件大小
+        fseek(file, 0L, SEEK_END);
+        size = (uint32_t)ftell(file);
+        rewind(file);
+        sprintf(tx_buffer, "HTTP/1.0 404 NOT FOUNDContent-Length:%d\r\n\r\n", size);
+        http_send(tcp, tx_buffer, strlen(tx_buffer));
+        goto send;
+        return;
+    }
 
+    // 否则，读取文件内容，并发送；由于存在图片类型，需要二进制读
+    file = fopen(file_path, "rb");
+    // 获取文件大小
+    fseek(file, 0L, SEEK_END);
+    size = (uint32_t)ftell(file);
+    rewind(file);
+    // 发送 http 报头
+    sprintf(tx_buffer, "HTTP/1.0 200 OK\r\nContent-Length:%d\r\n\r\n", size);
+    http_send(tcp, tx_buffer, strlen(tx_buffer));
+    // 读取文件内容并发送
+    
+send:
+    while (!feof(file)) {
+        size = fread(tx_buffer, 1, 1024, file);
+        if (http_send(tcp, tx_buffer, size) <= 0) {
+            fclose(file);
+            return;
+        }
+    }
+    fclose(file);
 }
 
 static void http_handler(tcp_connect_t* tcp, connect_state_t state) {
@@ -132,34 +173,50 @@ void http_server_run(void) {
         int i;
         char* c = rx_buffer;
 
-
         /*
         1、调用get_line从rx_buffer中获取一行数据，如果没有数据，则调用close_http关闭tcp，并继续循环
         */
 
-       // TODO
+        // TODO
+        if (get_line(tcp, rx_buffer, 1024) <= 0){
+            close_http(tcp);
+            continue;
+        }
 
+        printf("getline:%s\n", rx_buffer);
 
         /*
         2、检查是否有GET请求，如果没有，则调用close_http关闭tcp，并继续循环
         */
 
-       // TODO
-
+        // TODO
+        // 比较前三个字符是否为 GET
+        if (strncmp(rx_buffer, "GET", 3) != 0){
+            close_http(tcp);
+            continue;
+        }
 
         /*
         3、解析GET请求的路径，注意跳过空格，找到GET请求的文件，调用send_file发送文件
         */
 
-       // TODO
-
+        // TODO
+        // 第5个字节开始就是url_path
+        c += 4;
+        i = 0;
+        while(*c != ' '){
+            url_path[i++] = *(c++);
+        }
+        url_path[i] = '\0';
+        // 使用send_file发送文件
+        send_file(tcp, url_path);
 
         /*
         4、调用close_http关掉连接
         */
 
-       // TODO
-
+        // TODO
+        close_http(tcp);
 
         printf("!! final close\n");
     }
