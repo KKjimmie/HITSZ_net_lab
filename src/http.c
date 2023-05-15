@@ -105,13 +105,13 @@ static void send_file(tcp_connect_t* tcp, const char* url) {
     // 查看是否是文件类型，如果不是，则发送404 NOT FOUND，返回404页面
     struct stat st;
     if (stat(file_path, &st) != 0) {
-        sprintf(file_path, "%s/404.html", HTTP_DOC_DIR);
+        sprintf(file_path, "%s/404page.html", HTTP_DOC_DIR);
         file = fopen(file_path, "rb");
         // 获取文件大小
         fseek(file, 0L, SEEK_END);
         size = (uint32_t)ftell(file);
         rewind(file);
-        sprintf(tx_buffer, "HTTP/1.0 404 NOT FOUNDContent-Length:%d\r\n\r\n", size);
+        sprintf(tx_buffer, "HTTP/1.0 404 NOT FOUND\r\nContent-Length:%d\r\n\r\n", size);
         http_send(tcp, tx_buffer, strlen(tx_buffer));
         goto send;
         return;
